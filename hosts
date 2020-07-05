@@ -1,0 +1,10 @@
+[ansible_servers]
+
+localhost ansible_connection=local ansible_user=root ansible_ssh_pass=password ansible_become_pass=password
+
+
+
+[samba_servers]
+
+server1 ansible_host=192.168.111.128 ansible_port=22 ansible_user=ari1 ansible_ssh_pass=password ansible_become_pass=password
+server2 ansible_host=192.168.111.130 ansible_port=22 ansible_user=ari1 ansible_ssh_pass=password ansible_become_pass=password

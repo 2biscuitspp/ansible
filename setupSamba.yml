@@ -1,0 +1,110 @@
+---
+- hosts: samba_servers
+  tasks:
+  - name: install samba
+    become: true
+    apt: pkg=samba state=latest
+
+  - name: install rsync
+    become: true
+    apt: pkg=rsync state=latest
+
+  - name: Update and upgrade apt packages
+    become: true
+    apt:
+     upgrade: 'yes'
+     update_cache: yes  
+
+  - name: Blank Samba config
+    become: true
+    file:
+     path: /etc/samba/smb.conf
+     state: absent
+    file:
+     path: /etc/samba/smb.conf
+     state: touch
+  - name: Samba config
+    become: true
+    blockinfile:
+     dest: /etc/samba/smb.conf
+     block: |
+      #======================= Global Settings ===================================== 
+      [global]
+      workgroup = Kai Iwi
+      map to guest = bad user
+      dns proxy = no
+      #============================ Share Definitions ============================== 
+      [Work Share]
+      browsable =yes
+      writable = yes
+      guest ok = no
+      read only = no
+      path = /samba/shares/workshare
+      #create mask = 0775
+
+      [Group Share]
+      valid users = @workgroup
+      browsable = yes
+      writable = yes
+      guest ok = no
+      read only = no
+      path = /samba/shares/groupshare
+      #create mask = 0770
+
+  - name: create samba group
+    become: true
+    group:
+     name: workgroup
+     state: present
+   
+  - name: add users to group
+    become: true
+    user:
+     name: ari2
+     group: workgroup
+    user:
+     name: ari3
+     group: workgroup
+  
+- hosts: server2
+  tasks:
+  - name: update workgroup name on server2
+    become: true
+    replace:
+      dest: /etc/samba/smb.conf
+      regexp: 'workgroup = Kai Iwi'
+      replace: 'workgroup = Brunswick'
+
+- hosts: server1
+  tasks:
+  - name: rsync create scriptfile
+    become: true
+    file:
+     path: /etc/samba/syncSamba.sh
+     state: touch
+     mode: +x
+
+  - name: rsync populate script
+    become: true 
+    blockinfile:
+     dest: /etc/samba/syncSamba.sh
+     block: |
+      rsync -az /etc/samba/shares/groupshare/ root@192.168.111.130:/etc/samba/shares/groupshare/
+      rsync -az root@192.168.111.130:/etc/samba/shares/groupshare/ /etc/samba/shares/groupshare/
+      rsync -az /etc/samba/shares/workshare/ root@192.168.111.130:/etc/samba/shares/workshare/
+      rsync -az root@192.168.111.130:/etc/samba/shares/workshare/ /etc/samba/shares/workshare/
+
+  - name: create cronjob to run syncSamba.sh
+    become: true
+    cron:
+     name: "run syncSamba"
+     minute: "10"
+     job: "/etc/samba/syncSamba.sh"
+
+- hosts: samba_servers
+  tasks:
+  - name: restart samba
+    become: true
+    service:
+     name: smbd
+     state: reloaded
